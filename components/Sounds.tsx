@@ -7,9 +7,10 @@ interface SoundsProps {
   books: number;
   keys: number;
   health: number;
+  level: number;
 }
 
-const Sounds: React.FC<SoundsProps> = ({ gameState, books, keys, health }) => {
+const Sounds: React.FC<SoundsProps> = ({ gameState, books, keys, health, level }) => {
   const ambienceRef = useRef<HTMLAudioElement | null>(null);
   const heartbeatRef = useRef<HTMLAudioElement | null>(null);
   
@@ -20,7 +21,8 @@ const Sounds: React.FC<SoundsProps> = ({ gameState, books, keys, health }) => {
 
   // Initialize Audio Objects
   useEffect(() => {
-    ambienceRef.current = new Audio(SOUNDS.AMBIENCE);
+    // Determine initial track based on level, but default to MENU_MUSIC
+    ambienceRef.current = new Audio(SOUNDS.MENU_MUSIC);
     ambienceRef.current.loop = true;
     ambienceRef.current.volume = 0.5;
 
@@ -34,11 +36,61 @@ const Sounds: React.FC<SoundsProps> = ({ gameState, books, keys, health }) => {
     };
   }, []);
 
-  // Handle Ambience (Play only in Menu and Playing)
+  // Handle Music Track Switching
+  useEffect(() => {
+    if (!ambienceRef.current) return;
+
+    // Determine which track should be playing
+    let targetSrc = SOUNDS.MENU_MUSIC; 
+
+    if (gameState === GameState.MENU || gameState === GameState.LEVEL_SELECT || gameState === GameState.DIFFICULTY_SELECT) {
+        targetSrc = SOUNDS.MENU_MUSIC;
+    } else {
+        // In-Game Logic
+        if (level === 2) targetSrc = SOUNDS.LEVEL_2_MUSIC;
+        else if (level === 3) targetSrc = SOUNDS.LEVEL_3_MUSIC;
+        else targetSrc = SOUNDS.AMBIENCE; // Level 1
+    }
+
+    // If source is different, swap tracks
+    if (ambienceRef.current.src !== targetSrc) {
+        const wasPlaying = !ambienceRef.current.paused;
+        
+        ambienceRef.current.pause();
+        ambienceRef.current.src = targetSrc;
+        ambienceRef.current.loop = true;
+        
+        // Adjust volume for specific tracks if needed (e.g. music box might be loud)
+        ambienceRef.current.volume = 0.5;
+
+        // If we were playing, or if we just entered a state where we should be playing
+        const shouldPlay = 
+            gameState === GameState.MENU || 
+            gameState === GameState.LEVEL_SELECT || 
+            gameState === GameState.DIFFICULTY_SELECT || 
+            gameState === GameState.PLAYING || 
+            gameState === GameState.PAUSED;
+
+        if (shouldPlay) {
+            ambienceRef.current.play().catch(e => console.log("Track switch play failed", e));
+        }
+    }
+  }, [level, gameState]);
+
+  // Handle Play/Pause based on GameState
   useEffect(() => {
     if (!ambienceRef.current) return;
     
-    if (gameState === GameState.MENU || gameState === GameState.PLAYING || gameState === GameState.PAUSED) {
+    // We play music in MENU, SELECT screens, PLAYING, and PAUSED.
+    // We Stop music on GAME_OVER and ENDING (to let sound effects play/silence)
+    const shouldPlay = 
+        gameState === GameState.MENU || 
+        gameState === GameState.LEVEL_SELECT || 
+        gameState === GameState.DIFFICULTY_SELECT || 
+        gameState === GameState.PLAYING || 
+        gameState === GameState.PAUSED;
+
+    if (shouldPlay) {
         if (ambienceRef.current.paused) {
             ambienceRef.current.play().catch(e => console.log("Audio autoplay prevented", e));
         }

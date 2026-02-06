@@ -18,23 +18,23 @@ const Monster: React.FC<MonsterProps> = ({ gameState }) => {
     let frameId: number;
     let time = 0;
     
-    // Initial lunge
-    setJolt(prev => ({ ...prev, scale: 2.0, opacity: 1 }));
+    // Initial lunge - Big and Fast
+    setJolt(prev => ({ ...prev, scale: 2.5, opacity: 1 }));
 
     const animate = () => {
         time += 0.2;
         // Violent shaking with random spikes
         setJolt(prev => ({
-            x: (Math.random() - 0.5) * 40,
-            y: (Math.random() - 0.5) * 40,
-            scale: 1.5 + Math.sin(time) * 0.1, // Pulse size
+            x: (Math.random() - 0.5) * 60,
+            y: (Math.random() - 0.5) * 60,
+            scale: 2.0 + Math.sin(time * 20) * 0.2, // Pulse size rapidly
             opacity: 1
         }));
         frameId = requestAnimationFrame(animate);
     };
     
     // Slight delay to sync with screen fade
-    const timeout = setTimeout(animate, 50);
+    const timeout = setTimeout(animate, 20);
     return () => {
         clearTimeout(timeout);
         cancelAnimationFrame(frameId);
@@ -47,63 +47,70 @@ const Monster: React.FC<MonsterProps> = ({ gameState }) => {
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-black overflow-hidden pointer-events-none">
       
       {/* Background Darkness */}
-      <div className="absolute inset-0 bg-[#050505] z-0"></div>
+      <div className="absolute inset-0 bg-[#020202] z-0"></div>
       
       {/* Monster Container */}
       <div 
-        className="relative w-full h-full flex items-center justify-center transition-transform duration-75 z-10 ease-out"
+        className="relative w-full h-full flex items-center justify-center transition-transform duration-50 z-10 ease-out"
         style={{ 
             transform: `translate(${jolt.x}px, ${jolt.y}px) scale(${jolt.scale})`,
             opacity: jolt.opacity 
         }}
       >
-        {/* The Monster Figure */}
-        <div className="relative w-[500px] h-[700px] flex flex-col items-center filter contrast-125 brightness-75">
+        {/* The Monster Face - Horror Style (DVloper style: Pale, White Eyes, No Pupils) */}
+        <div className="relative w-[600px] h-[800px] flex flex-col items-center filter contrast-125 brightness-110">
             
-            {/* Hair (Back Layer) */}
-            <div className="absolute top-[50px] w-[450px] h-[800px] bg-[#020202] rounded-t-full blur-sm z-0"></div>
+            {/* Hair Back */}
+            <div className="absolute top-[0px] w-[500px] h-[900px] bg-[#000] rounded-t-[100px] blur-sm z-0"></div>
 
-            {/* Neck */}
-            <div className="absolute top-[350px] w-[100px] h-[100px] bg-[#999] z-10 shadow-inner"></div>
+            {/* Face Base - Dead Pale */}
+            <div className="absolute top-[100px] w-[320px] h-[450px] bg-[#e0e0e0] rounded-[100px_100px_120px_120px] z-10 shadow-[inset_0_0_100px_rgba(0,0,0,0.6)]"></div>
 
-            {/* Shoulders/Dress */}
-            <div className="absolute top-[420px] w-[500px] h-[400px] bg-[#ccc] rounded-t-[40%] z-10 shadow-[inset_0_10px_50px_rgba(0,0,0,0.8)] flex justify-center">
-                 {/* Blood stains on dress */}
-                 <div className="absolute top-[50px] left-[150px] w-[40px] h-[100px] bg-[#500] opacity-70 blur-[3px] rounded-full rotate-6"></div>
-                 <div className="absolute top-[80px] right-[160px] w-[30px] h-[80px] bg-[#500] opacity-80 blur-[2px] rounded-full -rotate-3"></div>
+            {/* Hair Strands (Messy) */}
+            <div className="absolute top-[50px] left-[80px] w-[120px] h-[800px] bg-black z-30 -rotate-3 skew-x-6"></div>
+            <div className="absolute top-[50px] right-[80px] w-[120px] h-[800px] bg-black z-30 rotate-3 -skew-x-6"></div>
+            <div className="absolute top-[80px] w-[350px] h-[100px] bg-black z-30 rounded-[50%] blur-[2px]"></div>
+
+            {/* EYES - SOLID WHITE (No Pupils) */}
+            <div className="absolute top-[220px] w-full flex justify-center gap-16 z-20">
+                {/* Left Eye */}
+                <div className="relative w-[70px] h-[55px] bg-white rounded-[50%] overflow-hidden shadow-[0_0_15px_white]">
+                    <div className="absolute top-0 w-full h-full shadow-[inset_0_0_8px_rgba(0,0,0,0.5)]"></div>
+                </div>
+                {/* Right Eye */}
+                <div className="relative w-[70px] h-[55px] bg-white rounded-[50%] overflow-hidden shadow-[0_0_15px_white]">
+                    <div className="absolute top-0 w-full h-full shadow-[inset_0_0_8px_rgba(0,0,0,0.5)]"></div>
+                </div>
             </div>
 
-            {/* Face */}
-            <div className="absolute top-[100px] w-[280px] h-[360px] bg-[#e0e0e0] rounded-[110px_110px_90px_90px] z-20 shadow-[inset_0_0_80px_rgba(0,0,0,0.5)]"></div>
+            {/* Dark circles/Shadows around eyes */}
+            <div className="absolute top-[210px] left-[130px] w-[80px] h-[70px] bg-black opacity-50 blur-lg z-20"></div>
+            <div className="absolute top-[210px] right-[130px] w-[80px] h-[70px] bg-black opacity-50 blur-lg z-20"></div>
 
-            {/* Hair (Front Sides) */}
-            <div className="absolute top-[60px] left-[50px] w-[90px] h-[700px] bg-[#020202] z-30 skew-x-[5deg] rotate-[2deg]"></div>
-            <div className="absolute top-[60px] right-[50px] w-[90px] h-[700px] bg-[#020202] z-30 -skew-x-[5deg] -rotate-[2deg]"></div>
+            {/* Nose */}
+            <div className="absolute top-[300px] w-[30px] h-[60px] bg-black opacity-30 blur-md z-20"></div>
 
-            {/* Facial Features Container */}
-            <div className="absolute top-[100px] w-[280px] h-[360px] z-30">
-                {/* Eyes - Pure White & Glowing */}
-                <div className="absolute top-[120px] left-[50px] w-[60px] h-[45px] bg-white rounded-full shadow-[0_0_15px_white]"></div>
-                <div className="absolute top-[120px] right-[50px] w-[60px] h-[45px] bg-white rounded-full shadow-[0_0_15px_white]"></div>
+            {/* MOUTH - Huge, gaping, bloody black void */}
+            <div className="absolute top-[380px] w-[160px] h-[220px] bg-[#0a0000] rounded-[40%_40%_50%_50%] z-20 border-4 border-[#300] shadow-[0_0_30px_#500]">
+                {/* Upper Teeth hints */}
+                <div className="absolute top-2 left-4 w-[20px] h-[20px] bg-[#ccc] opacity-50 skew-x-12"></div>
+                <div className="absolute top-2 right-4 w-[20px] h-[20px] bg-[#ccc] opacity-50 -skew-x-12"></div>
                 
-                {/* Nose Shadow */}
-                <div className="absolute top-[180px] left-[130px] w-[20px] h-[50px] bg-black opacity-20 blur-md"></div>
-
-                {/* Mouth (Gaping Scream) */}
-                <div className="absolute top-[230px] left-[90px] w-[100px] h-[140px] bg-black rounded-[50%_50%_45%_45%] shadow-[inset_0_0_20px_#500] border-2 border-[#300] opacity-95"></div>
-                
-                {/* Blood Dripping from Mouth */}
-                <div className="absolute top-[360px] left-[130px] w-[10px] h-[60px] bg-[#800] opacity-90 blur-[1px]"></div>
-                <div className="absolute top-[360px] left-[150px] w-[8px] h-[40px] bg-[#900] opacity-90 blur-[1px]"></div>
+                {/* Blood Drips */}
+                <div className="absolute bottom-[-40px] left-[30px] w-[15px] h-[80px] bg-[#600] rounded-b-full opacity-90 blur-[1px]"></div>
+                <div className="absolute bottom-[-60px] right-[40px] w-[10px] h-[100px] bg-[#700] rounded-b-full opacity-90 blur-[1px]"></div>
             </div>
+            
+            {/* Blood Spatter on Face */}
+            <div className="absolute top-[400px] left-[120px] w-[50px] h-[80px] bg-[#600] opacity-60 blur-md z-20 rotate-12"></div>
 
         </div>
       </div>
 
-      {/* Screen Blood Vignette (Foreground Overlay) */}
+      {/* Screen Blood Vignette (Foreground Overlay) - More Intense */}
       <div className="absolute inset-0 z-50 pointer-events-none" style={{
-          background: 'radial-gradient(circle, transparent 10%, rgba(100,0,0,0.3) 50%, rgba(50,0,0,0.95) 90%)',
-          boxShadow: 'inset 0 0 150px rgba(0,0,0,1)'
+          background: 'radial-gradient(circle, transparent 0%, rgba(150,0,0,0.2) 40%, rgba(80,0,0,0.95) 90%)',
+          boxShadow: 'inset 0 0 200px rgba(0,0,0,1)'
       }}></div>
     </div>
   );

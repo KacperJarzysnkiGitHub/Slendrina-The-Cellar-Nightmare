@@ -62,27 +62,26 @@ const UI: React.FC<UIProps> = ({
     }
   }, [gameState, onRestart]);
 
-  // Blood Overlay
+  // Blood Overlay (screen reddening)
   const bloodOpacity = (100 - health) / 100;
   
   const handleResumeClick = () => {
-    // Attempt to re-lock the pointer
     const canvas = document.querySelector('canvas');
     if (canvas) {
-        // Safe pointer lock request that catches the "user exited lock" error
         try {
             const promise = canvas.requestPointerLock() as unknown as Promise<void> | undefined;
             if (promise && typeof promise.catch === 'function') {
-                promise.catch(() => {
-                    // Swallow error - usually means user pressed ESC or clicked away too fast
-                    console.debug("Pointer lock cancelled or failed");
-                });
+                promise.catch(() => {});
             }
-        } catch (e) {
-            // Ignore synchronous errors
-        }
+        } catch (e) {}
     }
     onResume();
+  };
+
+  const getHealthColor = (hp: number) => {
+      // 120 is Green, 0 is Red
+      const hue = Math.max(0, Math.min(120, hp * 1.2));
+      return `hsl(${hue}, 100%, 40%)`;
   };
 
   return (
@@ -101,7 +100,7 @@ const UI: React.FC<UIProps> = ({
           className="absolute inset-0 z-10 transition-opacity duration-100 ease-in-out"
           style={{
               background: `radial-gradient(circle, transparent 50%, rgba(180,0,0,0.8) 100%)`,
-              opacity: bloodOpacity,
+              opacity: bloodOpacity * 0.8, // Slightly reduced so health bar is visible
               boxShadow: `inset 0 0 ${bloodOpacity * 100}px rgba(100,0,0,0.9)`
           }}
         />
@@ -127,9 +126,34 @@ const UI: React.FC<UIProps> = ({
             </div>
           )}
 
-          {/* Settings Icon (Visual only for now) */}
+          {/* Settings Icon */}
           <div className="absolute top-4 left-4">
              <span className="text-4xl text-gray-400">⚙️</span>
+          </div>
+
+          {/* HEALTH BAR (Left Side) */}
+          <div className="absolute top-20 left-4 w-48 flex flex-col gap-1">
+             <div className="flex justify-between items-end px-1">
+                <span className="text-gray-300 font-serif text-lg tracking-widest drop-shadow-md">HEALTH</span>
+                <span className="text-gray-400 font-serif text-sm">{Math.ceil(health)}%</span>
+             </div>
+             <div className="w-full h-4 bg-gray-900/90 border border-gray-600 rounded-sm overflow-hidden backdrop-blur-sm relative">
+                {/* Background Stripe Pattern */}
+                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 5px, #000 5px, #000 10px)' }}></div>
+                
+                {/* Fill */}
+                <div 
+                   className="h-full transition-all duration-300 ease-out relative"
+                   style={{ 
+                       width: `${Math.max(0, health)}%`, 
+                       backgroundColor: getHealthColor(health),
+                       boxShadow: `0 0 15px ${getHealthColor(health)}`
+                   }}
+                >
+                    {/* Gloss Effect */}
+                    <div className="absolute top-0 left-0 right-0 h-[50%] bg-white/20"></div>
+                </div>
+             </div>
           </div>
 
           {/* Hint for Controls */}

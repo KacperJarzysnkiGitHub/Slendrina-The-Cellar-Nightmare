@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { CellType, GameState, Item, Entity, Difficulty } from '../types';
-import { LEVEL_MAP, TEXTURES, INITIAL_PLAYER, INITIAL_ITEMS, MOVEMENT_SPEED, INTERACTION_DIST, SOUNDS } from '../constants';
+import { generateLevel, TEXTURES, MOVEMENT_SPEED, INTERACTION_DIST, SOUNDS } from '../constants';
 
 interface GameProps {
   onGameOver: () => void;
@@ -12,6 +12,7 @@ interface GameProps {
   setKeysCollected: (count: number) => void;
   setHealth: (hp: number) => void;
   difficulty: Difficulty;
+  level: number;
 }
 
 const Game: React.FC<GameProps> = ({ 
@@ -22,13 +23,14 @@ const Game: React.FC<GameProps> = ({
   setBooksCollected,
   setKeysCollected,
   setHealth,
-  difficulty
+  difficulty,
+  level
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   
   // Game Logic Refs
-  const mapRef = useRef<number[][]>(JSON.parse(JSON.stringify(LEVEL_MAP)));
-  const itemsRef = useRef<Item[]>(JSON.parse(JSON.stringify(INITIAL_ITEMS)));
+  const mapRef = useRef<number[][]>([]);
+  const itemsRef = useRef<Item[]>([]);
   const keysRef = useRef<number>(0);
   const booksRef = useRef<number>(0);
   const hpRef = useRef<number>(100);
@@ -38,14 +40,17 @@ const Game: React.FC<GameProps> = ({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const floorMeshRef = useRef<THREE.Mesh | null>(null);
+  const ceilingMeshRef = useRef<THREE.Mesh | null>(null);
   
-  // Replaced Sprite with Group for 3D Model
+  // Model Refs
   const slendrinaGroupRef = useRef<THREE.Group | null>(null);
   
   const slendrinaDataRef = useRef<Entity>({ x: 10, y: 10, active: false, texture: '', lastSeenTime: 0, spawnTime: 0, isJumpscaring: false });
   const nextSpawnTimeRef = useRef<number>(0);
   const itemMeshesRef = useRef<{ [key: string]: THREE.Object3D }>({});
   const doorMeshesRef = useRef<{ [key: string]: THREE.Mesh }>({});
+  const wallsRef = useRef<THREE.Mesh[]>([]);
   
   const requestRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
@@ -68,44 +73,29 @@ const Game: React.FC<GameProps> = ({
   const createBookModel = (id: string, x: number, y: number) => {
       const group = new THREE.Group();
       group.position.set(x, 1.0, y);
-      
-      // Random rotation for variety
       group.rotation.y = Math.random() * Math.PI * 2;
-      group.rotation.z = Math.PI / 6; // Tilt it slightly like it's resting or floating
+      group.rotation.z = Math.PI / 6; 
 
-      const coverMat = new THREE.MeshStandardMaterial({ 
-          color: 0xaa0000, // Brighter Red for better visibility
-          roughness: 0.5,
-          metalness: 0.1
-      });
-      const pageMat = new THREE.MeshStandardMaterial({ 
-          color: 0xe6dbc8, // Cream
-          roughness: 0.9 
-      });
+      const coverMat = new THREE.MeshStandardMaterial({ color: 0xaa0000, roughness: 0.5, metalness: 0.1 });
+      const pageMat = new THREE.MeshStandardMaterial({ color: 0xe6dbc8, roughness: 0.9 });
 
-      // 1. Spine
       const spine = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.09), coverMat);
       spine.position.x = -0.16;
       group.add(spine);
 
-      // 2. Front Cover
       const front = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.52, 0.02), coverMat);
       front.position.set(0.01, 0, 0.045);
       group.add(front);
 
-      // 3. Back Cover
       const back = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.52, 0.02), coverMat);
       back.position.set(0.01, 0, -0.045);
       group.add(back);
 
-      // 4. Pages
       const pages = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.48, 0.07), pageMat);
       pages.position.set(0.01, 0, 0);
       group.add(pages);
 
-      // Metadata for Interaction
       group.userData = { id, type: 'book', pickup: true };
-      
       return group;
   };
 
@@ -115,25 +105,17 @@ const Game: React.FC<GameProps> = ({
       group.scale.set(0.5, 0.5, 0.5); 
       group.rotation.x = Math.PI / 4;
 
-      // Rusty Metal Material
-      const metalMat = new THREE.MeshStandardMaterial({ 
-          color: 0x8b5a2b, // Rusty Bronze
-          roughness: 0.7,
-          metalness: 0.6
-      });
+      const metalMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.7, metalness: 0.6 });
 
-      // Shaft
       const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 1.4, 8), metalMat);
       shaft.rotation.z = Math.PI / 2;
       group.add(shaft);
 
-      // Head (Octagon/Torus-like)
       const head = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.08, 8, 8), metalMat);
       head.position.x = -0.7; 
       head.rotation.y = Math.PI / 2;
       group.add(head);
 
-      // Teeth
       const teeth = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.05), metalMat);
       teeth.position.set(0.5, -0.15, 0);
       group.add(teeth);
@@ -152,94 +134,104 @@ const Game: React.FC<GameProps> = ({
       group.name = "bodyGroup";
       pivot.add(group);
 
-      // MATERIALS
-      const skinMat = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, roughness: 0.5, metalness: 0 }); // Pale skin
-      const dressMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0.1 }); // White dress
-      const hairMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1.0 }); // Pitch black hair
-      const faceFeatureMat = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Black Mouth
-      // Glowing White Eyes - Brightness bumped for scary effect
-      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); 
+      // MATERIALS - DVloper Style (Pale, White Eyes)
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, roughness: 0.3, metalness: 0.0 }); // Very pale dead skin
+      const dressMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0 }); 
+      // Dirty white dress
+      dressMat.color.setHex(0xf0f0f0);
+      
+      const hairMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 });
+      const faceFeatureMat = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Black void mouth
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // SOLID WHITE EYES (No pupils)
 
-      // 1. BODY (Dress)
-      const bodyGeo = new THREE.CylinderGeometry(0.15, 0.4, 1.5, 12);
+      // 1. BODY
+      const bodyGeo = new THREE.CylinderGeometry(0.12, 0.45, 1.5, 12);
       const body = new THREE.Mesh(bodyGeo, dressMat);
       body.position.y = 0.75;
       group.add(body);
 
       // 2. NECK
-      const neckGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.2, 8);
+      const neckGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.25, 8);
       const neck = new THREE.Mesh(neckGeo, skinMat);
       neck.position.y = 1.55;
       group.add(neck);
 
       // 3. HEAD GROUP
       const headGroup = new THREE.Group();
-      headGroup.position.y = 1.65; 
+      headGroup.position.y = 1.7; 
       headGroup.name = "headGroup";
 
-      const headGeo = new THREE.SphereGeometry(0.18, 16, 16);
-      headGeo.scale(0.9, 1.2, 1.0);
+      const headGeo = new THREE.SphereGeometry(0.17, 16, 16);
+      headGeo.scale(0.85, 1.25, 0.9);
       const head = new THREE.Mesh(headGeo, skinMat);
       head.position.set(0, 0.1, 0);
       headGroup.add(head);
 
-      // 4. HAIR
+      // 4. HAIR (Long black hair)
       const hairGroup = new THREE.Group();
-      const hairBackGeo = new THREE.SphereGeometry(0.19, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.55);
+      const hairBackGeo = new THREE.SphereGeometry(0.18, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.55);
       const hairBack = new THREE.Mesh(hairBackGeo, hairMat);
       hairBack.rotation.x = Math.PI;
-      hairBack.position.set(0, 0.11, 0);
+      hairBack.position.set(0, 0.12, 0);
       hairGroup.add(hairBack);
-      const sideHairGeo = new THREE.BoxGeometry(0.12, 0.8, 0.12);
+      
+      // Long Side Hair
+      const sideHairGeo = new THREE.BoxGeometry(0.1, 0.9, 0.14);
       const hairL = new THREE.Mesh(sideHairGeo, hairMat);
-      hairL.position.set(-0.16, -0.05, 0.05);
-      hairL.rotation.z = 0.1;
+      hairL.position.set(-0.14, -0.1, 0.08);
+      hairL.rotation.z = 0.05;
+      hairL.rotation.y = -0.1;
       hairGroup.add(hairL);
+      
       const hairR = new THREE.Mesh(sideHairGeo, hairMat);
-      hairR.position.set(0.16, -0.05, 0.05);
-      hairR.rotation.z = -0.1;
+      hairR.position.set(0.14, -0.1, 0.08);
+      hairR.rotation.z = -0.05;
+      hairR.rotation.y = 0.1;
       hairGroup.add(hairR);
+      
       headGroup.add(hairGroup);
 
-      // 5. FACE
-      // Larger Eyes, distinctly white
-      const eyeGeo = new THREE.SphereGeometry(0.045, 8, 8);
+      // 5. FACE (White Eyes, No Pupils)
+      const eyeGeo = new THREE.SphereGeometry(0.045, 8, 8); // Slightly larger eyes
       const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-      eyeL.position.set(-0.06, 0.11, 0.165); // Moved slightly forward
+      eyeL.position.set(-0.055, 0.12, 0.16); // Pushed forward slightly
       headGroup.add(eyeL);
+      
       const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
-      eyeR.position.set(0.06, 0.11, 0.165);
+      eyeR.position.set(0.055, 0.12, 0.16);
       headGroup.add(eyeR);
 
-      // Dark circles around eyes for contrast
+      // Dark Sockets (Behind the eyes for depth)
       const eyeSocketGeo = new THREE.CircleGeometry(0.06, 8);
       const eyeSocketMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
       const socketL = new THREE.Mesh(eyeSocketGeo, eyeSocketMat);
-      socketL.position.set(-0.06, 0.11, 0.16);
+      socketL.position.set(-0.055, 0.12, 0.15);
       socketL.rotation.y = -0.2;
       headGroup.add(socketL);
       const socketR = new THREE.Mesh(eyeSocketGeo, eyeSocketMat);
-      socketR.position.set(0.06, 0.11, 0.16);
+      socketR.position.set(0.055, 0.12, 0.15);
       socketR.rotation.y = 0.2;
       headGroup.add(socketR);
 
-      const mouthGeo = new THREE.CapsuleGeometry(0.04, 0.1, 4, 8);
+      // Gaping Mouth (Black Void)
+      const mouthGeo = new THREE.CapsuleGeometry(0.05, 0.15, 4, 8);
       const mouth = new THREE.Mesh(mouthGeo, faceFeatureMat);
-      mouth.position.set(0, 0, 0.16);
+      mouth.position.set(0, -0.06, 0.15);
       mouth.scale.set(1, 1, 0.5); 
       mouth.name = "mouth";
       headGroup.add(mouth);
 
-      const bloodGeo = new THREE.BoxGeometry(0.01, 0.2, 0.01);
-      const bloodMat = new THREE.MeshBasicMaterial({ color: 0x880000 });
+      // Blood Stain under mouth
+      const bloodGeo = new THREE.BoxGeometry(0.02, 0.2, 0.01);
+      const bloodMat = new THREE.MeshBasicMaterial({ color: 0x550000 });
       const blood = new THREE.Mesh(bloodGeo, bloodMat);
-      blood.position.set(0.02, -0.1, 0.17);
+      blood.position.set(0, -0.18, 0.16);
       headGroup.add(blood);
 
       group.add(headGroup);
 
       // 6. ARMS
-      const armGeo = new THREE.CylinderGeometry(0.04, 0.035, 0.8, 8);
+      const armGeo = new THREE.CylinderGeometry(0.035, 0.03, 1.0, 8); 
       const handGeo = new THREE.SphereGeometry(0.05, 8, 8);
       
       const armLGroup = new THREE.Group();
@@ -247,9 +239,9 @@ const Game: React.FC<GameProps> = ({
       armLGroup.name = "armL";
       const armLMesh = new THREE.Mesh(armGeo, skinMat);
       armLMesh.rotation.x = -Math.PI / 2; 
-      armLMesh.position.z = 0.4; 
+      armLMesh.position.z = 0.5;
       const handL = new THREE.Mesh(handGeo, skinMat);
-      handL.position.set(0, 0, 0.8);
+      handL.position.set(0, 0, 1.0);
       armLGroup.add(armLMesh);
       armLGroup.add(handL);
       armLGroup.rotation.x = Math.PI / 2.5; 
@@ -261,41 +253,38 @@ const Game: React.FC<GameProps> = ({
       armRGroup.name = "armR";
       const armRMesh = new THREE.Mesh(armGeo, skinMat);
       armRMesh.rotation.x = -Math.PI / 2;
-      armRMesh.position.z = 0.4;
+      armRMesh.position.z = 0.5;
       const handR = new THREE.Mesh(handGeo, skinMat);
-      handR.position.set(0, 0, 0.8);
+      handR.position.set(0, 0, 1.0);
       armRGroup.add(armRMesh);
       armRGroup.add(handR);
       armRGroup.rotation.x = Math.PI / 2.5;
       armRGroup.rotation.y = 0.1;
       group.add(armRGroup);
       
-      // Shadow beneath the model
       const shadowGeo = new THREE.CircleGeometry(0.5, 32);
       const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.6 });
       const shadow = new THREE.Mesh(shadowGeo, shadowMat);
       shadow.rotation.x = -Math.PI / 2;
-      shadow.position.y = 0.02; // Just above z-fighting range
+      shadow.position.y = 0.02; 
       pivot.add(shadow);
 
       return pivot;
   };
 
-  // Initialize Scene
+  // --- INITIALIZATION ---
   useEffect(() => {
     if (!mountRef.current) return;
     
     // SCENE
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0a); // Dark grey instead of black
-    scene.fog = new THREE.FogExp2(0x0a0a0a, 0.12); // Less dense fog, better visibility
+    scene.background = new THREE.Color(0x050505); 
+    scene.fog = new THREE.FogExp2(0x050505, 0.15); 
     sceneRef.current = scene;
 
     // CAMERA
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(INITIAL_PLAYER.x, 1.6, INITIAL_PLAYER.y);
     camera.rotation.order = 'YXZ'; 
-    camera.rotation.y = Math.PI; 
     cameraRef.current = camera;
 
     // RENDERER
@@ -307,7 +296,7 @@ const Game: React.FC<GameProps> = ({
     rendererRef.current = renderer;
 
     // LIGHTING
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); 
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); 
     scene.add(ambientLight);
 
     const spotLight = new THREE.SpotLight(0xffffee, 8, 30, Math.PI / 4, 0.4, 1);
@@ -317,116 +306,11 @@ const Game: React.FC<GameProps> = ({
     camera.add(spotLight.target);
     scene.add(camera);
 
-    const playerLight = new THREE.PointLight(0xffaa00, 0.5, 5);
+    const playerLight = new THREE.PointLight(0xffaa00, 0.4, 6);
     camera.add(playerLight);
+    scene.add(camera);
 
-    // TEXTURES
-    const loader = new THREE.TextureLoader();
-    const wallTex = loader.load(TEXTURES.WALL);
-    const doorTex = loader.load(TEXTURES.DOOR);
-    const doorLockedTex = loader.load(TEXTURES.DOOR_LOCKED);
-    const exitTex = loader.load(TEXTURES.EXIT);
-    const floorTex = loader.load(TEXTURES.FLOOR);
-    const ceilingTex = loader.load(TEXTURES.CEILING);
-    
-    [wallTex, doorTex, doorLockedTex, exitTex, floorTex, ceilingTex].forEach(t => { 
-        t.colorSpace = THREE.SRGBColorSpace;
-        t.magFilter = THREE.NearestFilter; 
-        t.minFilter = THREE.NearestFilter; 
-    });
-
-    floorTex.wrapS = THREE.RepeatWrapping;
-    floorTex.wrapT = THREE.RepeatWrapping;
-    floorTex.repeat.set(LEVEL_MAP[0].length / 2, LEVEL_MAP.length / 2);
-
-    ceilingTex.wrapS = THREE.RepeatWrapping;
-    ceilingTex.wrapT = THREE.RepeatWrapping;
-    ceilingTex.repeat.set(LEVEL_MAP[0].length / 4, LEVEL_MAP.length / 4);
-
-    // MATERIALS
-    const wallGeo = new THREE.BoxGeometry(1, 3, 1);
-    const wallMat = new THREE.MeshStandardMaterial({ 
-        map: wallTex, 
-        roughness: 0.8,
-        metalness: 0.1 
-    });
-    
-    const mapHeight = mapRef.current.length;
-    const mapWidth = mapRef.current[0]?.length || 0;
-    
-    // Floor & Ceiling
-    const floorGeo = new THREE.PlaneGeometry(mapWidth, mapHeight);
-    const floorMat = new THREE.MeshStandardMaterial({ 
-        map: floorTex, 
-        roughness: 0.9,
-        metalness: 0.1,
-    });
-    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
-    floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.position.set(mapWidth/2, 0, mapHeight/2);
-    scene.add(floorMesh);
-
-    const ceilingMat = new THREE.MeshStandardMaterial({ 
-        map: ceilingTex, 
-        roughness: 1.0, 
-        color: 0x888888 
-    });
-    const ceilingMesh = new THREE.Mesh(floorGeo, ceilingMat);
-    ceilingMesh.rotation.x = Math.PI / 2;
-    ceilingMesh.position.set(mapWidth/2, 3, mapHeight/2);
-    scene.add(ceilingMesh);
-
-    // Build Level
-    for (let z = 0; z < mapHeight; z++) {
-        for (let x = 0; x < mapWidth; x++) {
-            const cell = mapRef.current[z][x];
-            const posX = x + 0.5; const posZ = z + 0.5;
-            if (cell === CellType.WALL) {
-                const mesh = new THREE.Mesh(wallGeo, wallMat);
-                mesh.position.set(posX, 1.5, posZ);
-                scene.add(mesh);
-            } else if (cell === CellType.DOOR || cell === CellType.DOOR_LOCKED || cell === CellType.EXIT) {
-                const dGeo = new THREE.BoxGeometry(1, 2.8, 0.1);
-                let map = doorTex;
-                if (cell === CellType.DOOR_LOCKED) map = doorLockedTex;
-                if (cell === CellType.EXIT) map = exitTex;
-                
-                const mat = new THREE.MeshStandardMaterial({ map: map, roughness: 0.5 });
-                const dMesh = new THREE.Mesh(dGeo, mat);
-                dMesh.position.set(posX, 1.4, posZ);
-                const left = (x > 0) ? mapRef.current[z][x-1] : 0;
-                const right = (x < mapWidth - 1) ? mapRef.current[z][x+1] : 0;
-                if (!(left === CellType.WALL || right === CellType.WALL)) dMesh.rotation.y = Math.PI / 2;
-                
-                // Store initial transform for reset
-                const initialRot = dMesh.rotation.y;
-                const initialPos = dMesh.position.clone();
-                dMesh.userData = { type: 'door', x, z, state: cell, initialRot, initialPos };
-
-                doorMeshesRef.current[`${x},${z}`] = dMesh;
-                scene.add(dMesh);
-            }
-        }
-    }
-
-    // ITEMS: 3D Models
-    itemsRef.current.forEach(item => {
-        let mesh;
-        if (item.type === 'book') {
-            mesh = createBookModel(item.id, item.x, item.y);
-        } else {
-            mesh = createKeyModel(item.id, item.x, item.y);
-        }
-        itemMeshesRef.current[item.id] = mesh;
-        scene.add(mesh);
-    });
-
-    const slendrinaGroup = createSlendrinaModel();
-    slendrinaGroup.visible = false;
-    slendrinaGroupRef.current = slendrinaGroup;
-    scene.add(slendrinaGroup);
-
-    // Setup Footsteps Audio
+    // Audio
     footstepsRef.current = new Audio(SOUNDS.FOOTSTEPS);
     footstepsRef.current.loop = true;
     footstepsRef.current.volume = 0.4;
@@ -445,6 +329,124 @@ const Game: React.FC<GameProps> = ({
         if (footstepsRef.current) footstepsRef.current.pause();
     };
   }, []);
+
+  // --- LEVEL LOADING ---
+  useEffect(() => {
+    if(!sceneRef.current) return;
+    const scene = sceneRef.current;
+
+    wallsRef.current.forEach(mesh => {
+        scene.remove(mesh);
+        if(mesh.geometry) mesh.geometry.dispose();
+    });
+    wallsRef.current = [];
+    
+    Object.values(doorMeshesRef.current).forEach(mesh => scene.remove(mesh));
+    doorMeshesRef.current = {};
+    Object.values(itemMeshesRef.current).forEach(mesh => scene.remove(mesh));
+    itemMeshesRef.current = {};
+    if(floorMeshRef.current) scene.remove(floorMeshRef.current);
+    if(ceilingMeshRef.current) scene.remove(ceilingMeshRef.current);
+    if(slendrinaGroupRef.current) scene.remove(slendrinaGroupRef.current);
+
+    const levelData = generateLevel(level);
+    mapRef.current = levelData.map;
+    itemsRef.current = JSON.parse(JSON.stringify(levelData.items)); 
+    
+    if (cameraRef.current) {
+        cameraRef.current.position.set(levelData.startPlayer.x, 1.6, levelData.startPlayer.y);
+        cameraRef.current.rotation.set(0, levelData.startPlayer.dir, 0);
+    }
+
+    const loader = new THREE.TextureLoader();
+    const wallTexUrl = level === 3 ? TEXTURES.BOOKSHELF : TEXTURES.WALL;
+    const wallTex = loader.load(wallTexUrl);
+    const doorTex = loader.load(TEXTURES.DOOR);
+    const doorLockedTex = loader.load(TEXTURES.DOOR_LOCKED);
+    const exitTex = loader.load(TEXTURES.EXIT);
+    const floorTex = loader.load(TEXTURES.FLOOR);
+    const ceilingTex = loader.load(TEXTURES.CEILING);
+    
+    [wallTex, doorTex, doorLockedTex, exitTex, floorTex, ceilingTex].forEach(t => { 
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.magFilter = THREE.NearestFilter; 
+        t.minFilter = THREE.NearestFilter; 
+    });
+
+    const mapH = mapRef.current.length;
+    const mapW = mapRef.current[0].length;
+    floorTex.wrapS = THREE.RepeatWrapping; floorTex.wrapT = THREE.RepeatWrapping;
+    floorTex.repeat.set(mapW / 2, mapH / 2);
+    ceilingTex.wrapS = THREE.RepeatWrapping; ceilingTex.wrapT = THREE.RepeatWrapping;
+    ceilingTex.repeat.set(mapW / 4, mapH / 4);
+
+    const wallGeo = new THREE.BoxGeometry(1, 3, 1);
+    const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.8, metalness: 0.1 });
+    
+    const floorGeo = new THREE.PlaneGeometry(mapW, mapH);
+    const floorMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.9, metalness: 0.1 });
+    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.position.set(mapW/2, 0, mapH/2);
+    scene.add(floorMesh);
+    floorMeshRef.current = floorMesh;
+
+    const ceilingMat = new THREE.MeshStandardMaterial({ map: ceilingTex, roughness: 1.0, color: 0x888888 });
+    const ceilingMesh = new THREE.Mesh(floorGeo, ceilingMat);
+    ceilingMesh.rotation.x = Math.PI / 2;
+    ceilingMesh.position.set(mapW/2, 3, mapH/2);
+    scene.add(ceilingMesh);
+    ceilingMeshRef.current = ceilingMesh;
+
+    for (let z = 0; z < mapH; z++) {
+        for (let x = 0; x < mapW; x++) {
+            const cell = mapRef.current[z][x];
+            const posX = x + 0.5; const posZ = z + 0.5;
+            
+            if (cell === CellType.WALL) {
+                const mesh = new THREE.Mesh(wallGeo, wallMat);
+                mesh.position.set(posX, 1.5, posZ);
+                scene.add(mesh);
+                wallsRef.current.push(mesh);
+            } else if (cell === CellType.DOOR || cell === CellType.DOOR_LOCKED || cell === CellType.EXIT) {
+                const dGeo = new THREE.BoxGeometry(1, 2.8, 0.1);
+                let map = doorTex;
+                if (cell === CellType.DOOR_LOCKED) map = doorLockedTex;
+                if (cell === CellType.EXIT) map = exitTex;
+                
+                const mat = new THREE.MeshStandardMaterial({ map: map, roughness: 0.5 });
+                const dMesh = new THREE.Mesh(dGeo, mat);
+                dMesh.position.set(posX, 1.4, posZ);
+                const left = (x > 0) ? mapRef.current[z][x-1] : 0;
+                const right = (x < mapW - 1) ? mapRef.current[z][x+1] : 0;
+                if (!(left === CellType.WALL || right === CellType.WALL)) dMesh.rotation.y = Math.PI / 2;
+                
+                const initialRot = dMesh.rotation.y;
+                const initialPos = dMesh.position.clone();
+                dMesh.userData = { type: 'door', x, z, state: cell, initialRot, initialPos };
+
+                doorMeshesRef.current[`${x},${z}`] = dMesh;
+                scene.add(dMesh);
+            }
+        }
+    }
+
+    itemsRef.current.forEach(item => {
+        let mesh;
+        if (item.type === 'book') mesh = createBookModel(item.id, item.x, item.y);
+        else mesh = createKeyModel(item.id, item.x, item.y);
+        itemMeshesRef.current[item.id] = mesh;
+        scene.add(mesh);
+    });
+
+    const slendrinaGroup = createSlendrinaModel();
+    slendrinaGroup.visible = false;
+    slendrinaGroupRef.current = slendrinaGroup;
+    scene.add(slendrinaGroup);
+
+  }, [level]);
+
+  // --- GAME LOOP & LOGIC ---
 
   useEffect(() => {
     const onLockChange = () => {
@@ -495,7 +497,6 @@ const Game: React.FC<GameProps> = ({
     return () => { window.removeEventListener('keydown', () => {}); window.removeEventListener('keyup', () => {}); };
   }, [gameState]);
 
-  // Handle Ending Start
   useEffect(() => {
       if (gameState === GameState.ENDING) {
           document.exitPointerLock();
@@ -515,18 +516,14 @@ const Game: React.FC<GameProps> = ({
       
       const interactables: THREE.Object3D[] = [];
       Object.values(doorMeshesRef.current).forEach(m => interactables.push(m));
-      // Add visible item groups
       Object.values(itemMeshesRef.current).forEach(m => { if (m.visible) interactables.push(m); });
       
-      // Recursive true to hit children of Groups (books/keys)
       const intersects = raycaster.intersectObjects(interactables, true);
       
       if (intersects.length > 0) {
           const hit = intersects[0];
-          if (hit.distance < INTERACTION_DIST + 0.5) { // Slightly increased range for 3D items
+          if (hit.distance < INTERACTION_DIST + 0.5) {
               let obj = hit.object;
-              
-              // Traverse up hierarchy to find the main object with userData
               while (obj.parent && obj.parent !== sceneRef.current && !obj.userData.type) {
                   obj = obj.parent;
               }
@@ -551,12 +548,10 @@ const Game: React.FC<GameProps> = ({
                           playDoorSound(true);
                       }
                   }
-              } else if (obj.userData.pickup) { // Book or Key
+              } else if (obj.userData.pickup) { 
                   const { id, type } = obj.userData;
-                  // Hide the group
                   obj.visible = false;
                   
-                  // Update logic state
                   const itemData = itemsRef.current.find(i => i.id === id);
                   if (itemData && !itemData.collected) {
                       itemData.collected = true;
@@ -576,7 +571,6 @@ const Game: React.FC<GameProps> = ({
   };
 
   const animate = useCallback((time: number) => {
-    // Keep running if Playing OR Ending (to animate the scare)
     if (gameState !== GameState.PLAYING && gameState !== GameState.ENDING) {
         lastTimeRef.current = 0;
         requestRef.current = requestAnimationFrame(animate);
@@ -589,7 +583,6 @@ const Game: React.FC<GameProps> = ({
 
     const cam = cameraRef.current;
     
-    // PLAYER MOVEMENT - Only in PLAYING state
     if (cam && gameState === GameState.PLAYING) {
         const moveSpeed = MOVEMENT_SPEED * dt;
         const forward = new THREE.Vector3(); const right = new THREE.Vector3();
@@ -607,13 +600,12 @@ const Game: React.FC<GameProps> = ({
         let moved = false;
         if (moveVec.length() > 0) {
             moveVec.normalize().multiplyScalar(moveSpeed);
-            cam.position.y = 1.6 + Math.sin(time * 0.015) * 0.05; // Slightly faster bob
+            cam.position.y = 1.6 + Math.sin(time * 0.015) * 0.05; 
             
             const oldPos = cam.position.clone();
             const newPos = oldPos.clone().add(moveVec);
             
             const padding = 0.3;
-            // X Axis
             let checkX = Math.floor(newPos.x + Math.sign(moveVec.x) * padding);
             let checkZ = Math.floor(oldPos.z);
             let row = mapRef.current[checkZ];
@@ -621,7 +613,6 @@ const Game: React.FC<GameProps> = ({
                 cam.position.x = newPos.x;
             }
             
-            // Z Axis
             checkX = Math.floor(cam.position.x);
             checkZ = Math.floor(newPos.z + Math.sign(moveVec.z) * padding);
             row = mapRef.current[checkZ];
@@ -629,7 +620,6 @@ const Game: React.FC<GameProps> = ({
                 cam.position.z = newPos.z;
             }
 
-            // Check if actually moved
             if (cam.position.distanceToSquared(oldPos) > 0.000001) {
                 moved = true;
             }
@@ -637,7 +627,6 @@ const Game: React.FC<GameProps> = ({
              cam.position.y = THREE.MathUtils.lerp(cam.position.y, 1.6, 0.1);
         }
 
-        // Handle Walking Sound - Only if actually moved
         if (moved && hpRef.current > 0) {
             if (footstepsRef.current?.paused) {
                 footstepsRef.current.play().catch(() => {});
@@ -650,55 +639,46 @@ const Game: React.FC<GameProps> = ({
         }
     }
 
-    // Animate Items (Rotate and Bob)
     Object.values(itemMeshesRef.current).forEach(obj => {
         if (obj.visible) {
-            obj.rotation.y += dt; // Slow Rotation
-            obj.position.y = 1.0 + Math.sin(time * 0.002) * 0.1; // Slow Bobbing
+            obj.rotation.y += dt; 
+            obj.position.y = 1.0 + Math.sin(time * 0.002) * 0.1; 
         }
     });
 
     if (gameState === GameState.ENDING && cam) {
-        // ENDING ANIMATION
-        // Spawn Slendrina in front of player
         const pivot = slendrinaGroupRef.current;
         if (pivot) {
              pivot.visible = true;
-             
-             // Calculate position in front of camera only once or track camera
-             // For effect, we lock her to camera frame
+             const bodyGroup = pivot.getObjectByName("bodyGroup");
+             if(bodyGroup) bodyGroup.rotation.x = 0; 
+
              const forward = new THREE.Vector3();
              cam.getWorldDirection(forward);
              forward.y = 0; forward.normalize();
              
-             // Put her close
-             const targetPos = cam.position.clone().add(forward.multiplyScalar(1.5));
+             const targetPos = cam.position.clone().add(forward.multiplyScalar(1.2));
              pivot.position.copy(targetPos);
+             pivot.position.y = 0;
              pivot.lookAt(cam.position);
              
-             // Violent shake
              const shake = 0.1;
              pivot.position.x += (Math.random() - 0.5) * shake;
-             pivot.position.y = 0 + (Math.random() - 0.5) * shake; // Floor level 0
              pivot.position.z += (Math.random() - 0.5) * shake;
 
-             // Animate parts
-             const bodyGroup = pivot.getObjectByName("bodyGroup");
              if (bodyGroup) {
                  const mouth = bodyGroup.getObjectByName("mouth");
-                 if (mouth) mouth.scale.y = 5 + Math.sin(time * 0.1); // Huge scream
+                 if (mouth) mouth.scale.y = 6 + Math.sin(time * 0.1);
                  
                  const head = bodyGroup.getObjectByName("headGroup");
                  if (head) {
-                     head.rotation.z = (Math.random() - 0.5) * 0.5; // Head twitch
-                     head.rotation.y = Math.sin(time * 0.05) * 0.2;
+                     head.rotation.z = (Math.random() - 0.5) * 0.8; 
                  }
                  
                  const armL = bodyGroup.getObjectByName("armL");
                  const armR = bodyGroup.getObjectByName("armR");
-                 // Arms reaching out
-                 if (armL) armL.rotation.x = -Math.PI / 1.8; 
-                 if (armR) armR.rotation.x = -Math.PI / 1.8;
+                 if (armL) armL.rotation.x = -Math.PI / 1.5; 
+                 if (armR) armR.rotation.x = -Math.PI / 1.5;
              }
         }
     } else {
@@ -724,9 +704,10 @@ const Game: React.FC<GameProps> = ({
               const mapW = mapRef.current[0].length;
               let spawned = false;
 
-              for(let i=0; i<5; i++) {
+              // Spawn logic
+              for(let i=0; i<8; i++) {
                   const angle = Math.random() * Math.PI * 2;
-                  const dist = 3 + Math.random() * 6;
+                  const dist = 5 + Math.random() * 8; 
                   const tx = cam.position.x + Math.cos(angle) * dist;
                   const tz = cam.position.z + Math.sin(angle) * dist;
                   const mx = Math.floor(tx);
@@ -741,22 +722,37 @@ const Game: React.FC<GameProps> = ({
                           const toSpawn = new THREE.Vector3(tx - cam.position.x, 0, tz - cam.position.z).normalize();
                           const dot = camDir.dot(toSpawn);
                           
-                          if (dot < 0.6) {
+                          // Spawn mainly if not looking directly or if behind
+                          if (dot < 0.6 || (level === 2 && Math.random() > 0.7)) {
                               s.x = tx; s.y = tz; s.active = true; s.spawnTime = time; s.isJumpscaring = false;
+                              
+                              // Reset Seen state on new spawn
+                              s.lastSeenTime = 0;
+
                               pivot.position.set(tx, 0, tz); 
                               pivot.visible = true; 
                               spawned = true; 
                               pivot.lookAt(cam.position.x, 0, cam.position.z);
+                              
+                              // Level 2 Crawling
+                              if (level === 2 && Math.random() < 0.3) {
+                                  bodyGroup.rotation.x = -Math.PI / 2.5; 
+                                  bodyGroup.position.y = 0.3; 
+                              } else {
+                                  bodyGroup.rotation.x = 0;
+                                  bodyGroup.position.y = 0;
+                              }
                               break;
                           }
                       }
                   }
               }
-              // Spawn rate adjustments could also be made here, but keeping default
-              if (spawned) nextSpawnTimeRef.current = time + 15000 + Math.random() * 5000;
+              
+              if (spawned) nextSpawnTimeRef.current = time + 12000 + Math.random() * 8000;
               else nextSpawnTimeRef.current = time + 1000; 
           }
       } else {
+          // --- ACTIVE SLENDRINA LOGIC ---
           const toModel = new THREE.Vector3().subVectors(pivot.position, cam.position);
           const dist = toModel.length();
           toModel.normalize();
@@ -765,70 +761,114 @@ const Game: React.FC<GameProps> = ({
           const dot = camDir.dot(toModel); 
           
           let visible = false;
-          if (dot > 0.65) visible = true; 
+          // In tunnels (narrow), visibility is easier
+          // dot > 0.55 means roughly within 60 degree FOV
+          if (dot > 0.55) visible = true; 
 
+          // Raycast check for walls - Slendrina cannot be seen through walls
+          if (visible) {
+             const raycaster = new THREE.Raycaster(cam.position, toModel, 0, dist);
+             const intersects = raycaster.intersectObjects(wallsRef.current, false);
+             if (intersects.length > 0) {
+                 // Blocked by wall
+                 visible = false;
+             }
+          }
+
+          // ALWAYS FACE PLAYER
           pivot.lookAt(cam.position.x, 0, cam.position.z);
+          
           const headGroup = bodyGroup.getObjectByName("headGroup");
+          if (headGroup) {
+              // Ensure head looks at camera vertically (pitch)
+              // This makes her stare directly into your soul
+              headGroup.rotation.y = 0; // Lock Y
+              headGroup.rotation.z = 0; 
+              
+              // Simple pitch calculation roughly
+              const dy = cam.position.y - (pivot.position.y + 1.7); // Head height approx 1.7
+              const pitch = -Math.atan2(dy, dist);
+              headGroup.rotation.x = pitch; 
+          }
+
           const armL = bodyGroup.getObjectByName("armL");
           const armR = bodyGroup.getObjectByName("armR");
           const mouth = bodyGroup.getObjectByName("mouth");
+          
+          const isCrawling = level === 2 && bodyGroup.rotation.x < -0.5;
 
-          bodyGroup.position.y = Math.sin(time * 0.002) * 0.05;
+          if (!isCrawling) {
+             bodyGroup.position.y = Math.sin(time * 0.002) * 0.05; 
+          } else {
+             bodyGroup.position.y = 0.3 + Math.abs(Math.sin(time * 0.01)) * 0.05;
+          }
 
           if (visible) {
-              if (!s.isJumpscaring && dist < 12) {
+              // PLAYER SEES HER
+              s.lastSeenTime = time; // Mark as currently seen
+
+              // Player is looking at her
+              if (!s.isJumpscaring && dist < 12) { // Increased distance slightly
                    s.isJumpscaring = true;
               }
               if (s.isJumpscaring) {
-                 const vibration = 0.05;
+                 const vibration = 0.08;
                  pivot.position.x += (Math.random() - 0.5) * vibration;
                  pivot.position.z += (Math.random() - 0.5) * vibration;
-                 pivot.translateZ(dt * 0.5); 
+                 pivot.translateZ(dt * 1.5); 
               }
 
-              // DIFFICULTY LOGIC: Damage Rate
-              // Easy (8s): 100/8 = 12.5 per sec
-              // Medium (5s): 100/5 = 20 per sec
-              // Hard (2s): 100/2 = 50 per sec
               let damageRate = 20;
               if (difficulty === Difficulty.EASY) damageRate = 12.5;
               if (difficulty === Difficulty.MEDIUM) damageRate = 20;
               if (difficulty === Difficulty.HARD) damageRate = 50;
 
-              hpRef.current -= damageRate * dt; 
-              setHealth(hpRef.current);
+              if (!isCrawling) {
+                  hpRef.current -= damageRate * dt; 
+                  setHealth(hpRef.current);
+                  
+                  if (hpRef.current <= 0) {
+                      document.exitPointerLock();
+                      onGameOver();
+                  }
+              }
               
-              if (hpRef.current <= 0) {
-                  document.exitPointerLock();
-                  onGameOver();
-              }
-              if (headGroup) {
-                  headGroup.rotation.y = Math.sin(time * 0.05) * 0.2; 
-                  headGroup.rotation.z = (Math.random() - 0.5) * 0.2;
-              }
-              if (armL) armL.rotation.x = THREE.MathUtils.lerp(armL.rotation.x, -Math.PI / 2 + 0.2, dt * 3);
-              if (armR) armR.rotation.x = THREE.MathUtils.lerp(armR.rotation.x, -Math.PI / 2 + 0.2, dt * 3);
-              if (mouth) mouth.scale.y = THREE.MathUtils.lerp(mouth.scale.y, 4, dt * 8);
+              if (armL) armL.rotation.x = -Math.PI / 2 + Math.sin(time * 10) * 0.2;
+              if (armR) armR.rotation.x = -Math.PI / 2 + Math.cos(time * 10) * 0.2;
+              if (mouth) mouth.scale.y = 5 + Math.random();
 
           } else {
-              if (headGroup) {
-                  headGroup.rotation.y = THREE.MathUtils.lerp(headGroup.rotation.y, 0, dt * 5);
-                  headGroup.rotation.z = THREE.MathUtils.lerp(headGroup.rotation.z, 0, dt * 5);
-              }
-              if (armL) armL.rotation.x = THREE.MathUtils.lerp(armL.rotation.x, Math.PI / 2.5, dt * 5);
-              if (armR) armR.rotation.x = THREE.MathUtils.lerp(armR.rotation.x, Math.PI / 2.5, dt * 5);
-              if (mouth) mouth.scale.y = THREE.MathUtils.lerp(mouth.scale.y, 1, dt * 5);
-
-              if (s.isJumpscaring) {
-                  s.isJumpscaring = false;
+              // PLAYER TURNED AROUND (Not Looking)
+              
+              // DESPAWN MECHANIC:
+              // If she was seen (lastSeenTime > 0) and now player has turned away quickly, 
+              // she should disappear.
+              // We give a tiny grace period (200ms) to allow for quick glitches/mouse flicks 
+              // without accidental despawns, but effectively "Turning Around Fast" triggers this.
+              
+              if (s.lastSeenTime > 0 && (time - s.lastSeenTime > 200)) {
+                  // Despawn
                   s.active = false;
                   pivot.visible = false;
+                  s.isJumpscaring = false;
+                  // Set next spawn to happen in 5-10 seconds
                   nextSpawnTimeRef.current = time + 5000 + Math.random() * 5000;
+                  s.lastSeenTime = 0; 
               }
+              
+              // Reset pose if waiting to be seen or in grace period
+              if (headGroup) {
+                  headGroup.rotation.x = 0;
+              }
+              if (armL) armL.rotation.x = Math.PI / 2.5;
+              if (armR) armR.rotation.x = Math.PI / 2.5;
+              if (mouth) mouth.scale.y = 1;
           }
 
-          if (time - s.spawnTime > 8000 || dist > 25) {
+          // Timeout if active too long without interaction
+          if (time - s.spawnTime > 20000 || dist > 35) {
               s.active = false; pivot.visible = false; s.isJumpscaring = false;
+              s.lastSeenTime = 0;
           }
       }
   };
@@ -837,33 +877,18 @@ const Game: React.FC<GameProps> = ({
   
   useEffect(() => {
       if (gameState === GameState.MENU) {
-          mapRef.current = JSON.parse(JSON.stringify(LEVEL_MAP));
-          itemsRef.current = JSON.parse(JSON.stringify(INITIAL_ITEMS));
           keysRef.current = 0; booksRef.current = 0; hpRef.current = 100;
           slendrinaDataRef.current.active = false; slendrinaDataRef.current.isJumpscaring = false;
           nextSpawnTimeRef.current = performance.now() + 10000;
           
-          if (cameraRef.current) { 
-              cameraRef.current.position.set(INITIAL_PLAYER.x, 1.6, INITIAL_PLAYER.y); 
-              cameraRef.current.rotation.set(0, Math.PI, 0); 
-          }
-          
-          // RESET 3D SCENE VISUALS
-          Object.values(itemMeshesRef.current).forEach(mesh => {
-              mesh.visible = true;
-          });
+          Object.values(itemMeshesRef.current).forEach(mesh => mesh.visible = true);
           Object.values(doorMeshesRef.current).forEach(mesh => {
-              // Reset logical state to match map
               const { x, z } = mesh.userData;
               mesh.userData.state = mapRef.current[z][x];
-              
-              // Reset visuals
               if (mesh.userData.initialPos) mesh.position.copy(mesh.userData.initialPos);
               if (mesh.userData.initialRot !== undefined) mesh.rotation.y = mesh.userData.initialRot;
           });
-          if (slendrinaGroupRef.current) {
-              slendrinaGroupRef.current.visible = false;
-          }
+          if (slendrinaGroupRef.current) slendrinaGroupRef.current.visible = false;
       }
   }, [gameState]);
 

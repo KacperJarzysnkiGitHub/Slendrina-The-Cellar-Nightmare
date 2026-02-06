@@ -60,14 +60,15 @@ const Levels: React.FC<LevelsProps> = ({ onBack, onSelectLevel }) => {
                 </div>
              </button>
 
-             {/* Cellar 3 */}
+             {/* Cellar 3 - The Library */}
              <button 
                onClick={() => onSelectLevel(3)}
                className="group relative w-72 h-44 md:w-80 md:h-48 border-4 border-gray-800 hover:border-red-600 transition-colors duration-300 overflow-hidden bg-black shadow-[0_0_20px_black]"
              >
                 <div 
                   className="absolute inset-0 bg-cover bg-center opacity-60 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500"
-                  style={{ backgroundImage: `url(${TEXTURES.CEILING})`, filter: 'grayscale(1) brightness(0.5) contrast(1.5)' }}
+                  // Using DOOR texture (wood) to represent bookshelves/library
+                  style={{ backgroundImage: `url(${TEXTURES.DOOR})`, filter: 'brightness(0.6) contrast(1.2)' }}
                 />
                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 group-hover:bg-transparent transition-colors duration-300">
                    <span className="text-3xl text-red-100 font-horror tracking-wider drop-shadow-md group-hover:scale-110 transition-transform">CELLAR 3</span>

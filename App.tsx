@@ -9,6 +9,7 @@ import { GameState, Difficulty } from './types';
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.MEDIUM);
+  const [level, setLevel] = useState<number>(1);
   const [booksCollected, setBooksCollected] = useState(0);
   const [keysCollected, setKeysCollected] = useState(0);
   const [health, setHealth] = useState(100);
@@ -24,9 +25,9 @@ const App: React.FC = () => {
   };
 
   // Level Selected -> Go to Difficulty Select
-  const handleLevelSelect = (level: number) => {
-    console.log(`Selected Level ${level}`);
-    // Future: Set map based on level
+  const handleLevelSelect = (selectedLevel: number) => {
+    console.log(`Selected Level ${selectedLevel}`);
+    setLevel(selectedLevel);
     setGameState(GameState.DIFFICULTY_SELECT);
   };
 
@@ -49,7 +50,6 @@ const App: React.FC = () => {
     setHealth(100);
     setBooksCollected(0);
     setKeysCollected(0);
-    // Removed window.location.reload() to prevent crashes and enable smooth state reset
   };
 
   const handleResume = () => {
@@ -67,6 +67,7 @@ const App: React.FC = () => {
         setKeysCollected={setKeysCollected}
         setHealth={setHealth}
         difficulty={difficulty}
+        level={level}
       />
       <Player gameState={gameState} health={health} />
       <Monster gameState={gameState} />
@@ -75,6 +76,7 @@ const App: React.FC = () => {
         books={booksCollected} 
         keys={keysCollected}
         health={health}
+        level={level}
       />
       <UI 
         gameState={gameState}
