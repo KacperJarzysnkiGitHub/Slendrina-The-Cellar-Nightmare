@@ -8,6 +8,9 @@ export const ROTATION_SPEED = 2.5;
 export const INTERACTION_DIST = 1.0;
 
 export const SOUNDS = {
+  // UI Click
+  CLICK: 'https://files.catbox.moe/8tpg64.wav',
+  
   // Main Menu Music
   MENU_MUSIC: 'https://lambda.vgmtreasurechest.com/soundtracks/slendrina-the-cellar-android-gamerip-2014/fruzmlvs/04.%20Slendrina%20The%20Cellar%20Menu%20Music.mp3',
   // Level 1 Music (Dark Drone)
@@ -19,14 +22,16 @@ export const SOUNDS = {
   
   // High pitched scream
   SCREAM: 'https://static.wikia.nocookie.net/granny/images/0/01/SlendrinaScream2.ogg/revision/latest?cb=20231015130800',
-  // Paper rustle
+  // Paper rustle / Book Pickup
+  BOOK_PICKUP: 'https://files.catbox.moe/olwzz4.wav',
+  // Old Page flip (keeping for reference if needed, but using BOOK_PICKUP for collection)
   PAGE: 'https://cdn.pixabay.com/download/audio/2022/03/24/audio_34b7a1d7f6.mp3?filename=page-flip-4-19253.mp3',
   // Keys jingle
-  KEY: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_2756616019.mp3?filename=keys-unlocking-door-22345.mp3', // Using unlock sound for pickup
+  KEY: 'https://files.catbox.moe/jqg9fh.wav', // Using unlock sound for pickup
   // Door creak
-  DOOR_OPEN: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_6b91176b6b.mp3?filename=door-creak-12154.mp3',
+  DOOR_OPEN: 'https://files.catbox.moe/5z5i0p.wav',
   // Unlock click
-  DOOR_UNLOCK: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_2756616019.mp3?filename=keys-unlocking-door-22345.mp3',
+  DOOR_UNLOCK: 'https://files.catbox.moe/tsy8te.wav',
   // Heartbeat for low health
   HEARTBEAT: 'https://cdn.pixabay.com/download/audio/2022/02/07/audio_6d20355152.mp3?filename=heartbeat-sound-effect-22687.mp3',
   // Gasp

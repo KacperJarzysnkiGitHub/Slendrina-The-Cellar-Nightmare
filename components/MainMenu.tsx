@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TEXTURES } from '../constants';
+import { TEXTURES, SOUNDS } from '../constants';
 
 interface MainMenuProps {
   onStart: () => void;
@@ -8,7 +8,29 @@ interface MainMenuProps {
 const MainMenu: React.FC<MainMenuProps> = ({ onStart }) => {
   const [showHelp, setShowHelp] = useState(false);
 
+  const playClick = () => {
+    const audio = new Audio(SOUNDS.CLICK);
+    audio.volume = 0.5;
+    audio.play().catch(() => {});
+  };
+
+  const handleStart = () => {
+    playClick();
+    onStart();
+  };
+
+  const handleHelp = () => {
+    playClick();
+    setShowHelp(true);
+  };
+
+  const handleBack = () => {
+    playClick();
+    setShowHelp(false);
+  };
+
   const handleQuit = () => {
+    playClick();
     // In a browser, we can't really "quit", so we just reload or show a message
     window.location.reload();
   };
@@ -101,7 +123,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart }) => {
           
           {/* PLAY BUTTON (Left Wall) */}
           <button 
-             onClick={onStart}
+             onClick={handleStart}
              className="absolute top-[55%] left-[10%] md:left-[15%] pointer-events-auto transform -rotate-6 hover:scale-110 transition-transform duration-200 group"
           >
              <span className="text-6xl md:text-8xl text-red-600 font-horror drop-shadow-[0_0_10px_black] group-hover:text-red-500 group-hover:drop-shadow-[0_0_20px_red]">
@@ -111,7 +133,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart }) => {
 
           {/* HELP BUTTON (Right Wall) */}
           <button 
-             onClick={() => setShowHelp(true)}
+             onClick={handleHelp}
              className="absolute top-[55%] right-[10%] md:right-[15%] pointer-events-auto transform rotate-6 hover:scale-110 transition-transform duration-200 group"
           >
              <span className="text-6xl md:text-8xl text-red-600 font-horror drop-shadow-[0_0_10px_black] group-hover:text-red-500 group-hover:drop-shadow-[0_0_20px_red]">
@@ -144,7 +166,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onStart }) => {
                     <li>If she screams, TURN AROUND immediately.</li>
                 </ul>
                 <button 
-                  onClick={() => setShowHelp(false)}
+                  onClick={handleBack}
                   className="mt-10 px-8 py-2 border border-red-600 text-red-500 text-3xl hover:bg-red-900 hover:text-white transition"
                 >
                   BACK

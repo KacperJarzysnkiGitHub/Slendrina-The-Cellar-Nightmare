@@ -4,6 +4,7 @@ import MainMenu from './MainMenu';
 import GameOver from './GameOver';
 import Levels from './Levels';
 import DifficultySelect from './Difficulty';
+import { SOUNDS } from '../constants';
 
 interface UIProps {
   gameState: GameState;
@@ -34,6 +35,12 @@ const UI: React.FC<UIProps> = ({
 }) => {
   const [inSettings, setInSettings] = useState(false);
   
+  const playClick = () => {
+    const audio = new Audio(SOUNDS.CLICK);
+    audio.volume = 0.5;
+    audio.play().catch(() => {});
+  };
+
   // Reset settings view when menu is closed
   useEffect(() => {
     if (gameState !== GameState.PAUSED) {
@@ -66,6 +73,7 @@ const UI: React.FC<UIProps> = ({
   const bloodOpacity = (100 - health) / 100;
   
   const handleResumeClick = () => {
+    playClick();
     const canvas = document.querySelector('canvas');
     if (canvas) {
         try {
@@ -76,6 +84,21 @@ const UI: React.FC<UIProps> = ({
         } catch (e) {}
     }
     onResume();
+  };
+
+  const handleSettingsClick = () => {
+    playClick();
+    setInSettings(true);
+  };
+
+  const handleMainMenuClick = () => {
+    playClick();
+    onRestart();
+  };
+
+  const handleBackFromSettings = () => {
+    playClick();
+    setInSettings(false);
   };
 
   const getHealthColor = (hp: number) => {
@@ -179,13 +202,13 @@ const UI: React.FC<UIProps> = ({
                 RESUME
               </button>
               <button 
-                onClick={() => setInSettings(true)}
+                onClick={handleSettingsClick}
                 className="px-6 py-3 bg-transparent border border-gray-500 hover:bg-white/10 text-white font-serif text-xl transition"
               >
                 SETTINGS
               </button>
               <button 
-                onClick={onRestart}
+                onClick={handleMainMenuClick}
                 className="px-6 py-3 bg-transparent border border-red-900 hover:bg-red-900/30 text-red-200 font-serif text-xl transition"
               >
                 MAIN MENU
@@ -204,7 +227,7 @@ const UI: React.FC<UIProps> = ({
               </div>
               
               <button 
-                onClick={() => setInSettings(false)}
+                onClick={handleBackFromSettings}
                 className="mt-8 px-6 py-3 bg-transparent border border-gray-500 hover:bg-white/10 text-white font-serif text-xl transition"
               >
                 BACK

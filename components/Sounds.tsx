@@ -15,8 +15,6 @@ const Sounds: React.FC<SoundsProps> = ({ gameState, books, keys, health, level }
   const heartbeatRef = useRef<HTMLAudioElement | null>(null);
   
   // Previous states to detect changes
-  const prevBooks = useRef(books);
-  const prevKeys = useRef(keys);
   const prevHealth = useRef(health);
 
   // Initialize Audio Objects
@@ -111,25 +109,6 @@ const Sounds: React.FC<SoundsProps> = ({ gameState, books, keys, health, level }
           heartbeatRef.current.currentTime = 0;
       }
   }, [health, gameState]);
-
-  // Collection Sounds
-  useEffect(() => {
-      if (books > prevBooks.current) {
-          const audio = new Audio(SOUNDS.PAGE);
-          audio.volume = 0.7;
-          audio.play().catch(() => {});
-      }
-      prevBooks.current = books;
-  }, [books]);
-
-  useEffect(() => {
-      if (keys > prevKeys.current) {
-          const audio = new Audio(SOUNDS.KEY);
-          audio.volume = 0.6;
-          audio.play().catch(() => {});
-      }
-      prevKeys.current = keys;
-  }, [keys]);
 
   // Game Over Scream
   useEffect(() => {

@@ -555,8 +555,20 @@ const Game: React.FC<GameProps> = ({
                   const itemData = itemsRef.current.find(i => i.id === id);
                   if (itemData && !itemData.collected) {
                       itemData.collected = true;
-                      if (type === 'book') { booksRef.current++; setBooksCollected(booksRef.current); }
-                      else { keysRef.current++; setKeysCollected(keysRef.current); }
+                      if (type === 'book') { 
+                          booksRef.current++; 
+                          setBooksCollected(booksRef.current);
+                          const audio = new Audio(SOUNDS.BOOK_PICKUP);
+                          audio.volume = 0.8;
+                          audio.play().catch(() => {});
+                      }
+                      else { 
+                          keysRef.current++; 
+                          setKeysCollected(keysRef.current); 
+                          const audio = new Audio(SOUNDS.KEY);
+                          audio.volume = 0.6;
+                          audio.play().catch(() => {});
+                      }
                   }
               }
           }

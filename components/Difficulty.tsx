@@ -1,6 +1,6 @@
 import React from 'react';
 import { Difficulty } from '../types';
-import { TEXTURES } from '../constants';
+import { TEXTURES, SOUNDS } from '../constants';
 
 interface DifficultyProps {
   onSelectDifficulty: (diff: Difficulty) => void;
@@ -8,6 +8,23 @@ interface DifficultyProps {
 }
 
 const DifficultySelect: React.FC<DifficultyProps> = ({ onSelectDifficulty, onBack }) => {
+
+  const playClick = () => {
+    const audio = new Audio(SOUNDS.CLICK);
+    audio.volume = 0.5;
+    audio.play().catch(() => {});
+  };
+
+  const handleSelect = (diff: Difficulty) => {
+    playClick();
+    onSelectDifficulty(diff);
+  };
+
+  const handleBack = () => {
+    playClick();
+    onBack();
+  };
+
   return (
     <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center select-none overflow-hidden">
       {/* Background Ambience similar to Levels but darker/focused */}
@@ -33,7 +50,7 @@ const DifficultySelect: React.FC<DifficultyProps> = ({ onSelectDifficulty, onBac
 
       <div className="relative z-10 flex flex-col items-center gap-8 w-full max-w-md">
         <button 
-          onClick={() => onSelectDifficulty(Difficulty.EASY)}
+          onClick={() => handleSelect(Difficulty.EASY)}
           className="group w-full text-center transition-transform hover:scale-110 duration-200"
         >
            <span className="text-5xl md:text-6xl text-red-600 font-horror tracking-wider drop-shadow-md group-hover:text-red-400 group-hover:drop-shadow-[0_0_10px_red]">
@@ -42,7 +59,7 @@ const DifficultySelect: React.FC<DifficultyProps> = ({ onSelectDifficulty, onBac
         </button>
 
         <button 
-          onClick={() => onSelectDifficulty(Difficulty.MEDIUM)}
+          onClick={() => handleSelect(Difficulty.MEDIUM)}
           className="group w-full text-center transition-transform hover:scale-110 duration-200"
         >
            <span className="text-5xl md:text-6xl text-red-600 font-horror tracking-wider drop-shadow-md group-hover:text-red-400 group-hover:drop-shadow-[0_0_10px_red]">
@@ -51,7 +68,7 @@ const DifficultySelect: React.FC<DifficultyProps> = ({ onSelectDifficulty, onBac
         </button>
 
         <button 
-          onClick={() => onSelectDifficulty(Difficulty.HARD)}
+          onClick={() => handleSelect(Difficulty.HARD)}
           className="group w-full text-center transition-transform hover:scale-110 duration-200"
         >
            <span className="text-5xl md:text-6xl text-red-600 font-horror tracking-wider drop-shadow-md group-hover:text-red-400 group-hover:drop-shadow-[0_0_10px_red]">
@@ -61,7 +78,7 @@ const DifficultySelect: React.FC<DifficultyProps> = ({ onSelectDifficulty, onBac
       </div>
 
       <button 
-        onClick={onBack}
+        onClick={handleBack}
         className="absolute bottom-10 right-10 text-4xl text-red-800 font-horror hover:text-red-500 hover:scale-110 transition-all duration-300 z-20 drop-shadow-lg"
       >
         BACK

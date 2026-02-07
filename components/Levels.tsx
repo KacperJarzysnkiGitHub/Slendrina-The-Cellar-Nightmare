@@ -1,5 +1,5 @@
 import React from 'react';
-import { TEXTURES } from '../constants';
+import { TEXTURES, SOUNDS } from '../constants';
 
 interface LevelsProps {
   onBack: () => void;
@@ -7,6 +7,23 @@ interface LevelsProps {
 }
 
 const Levels: React.FC<LevelsProps> = ({ onBack, onSelectLevel }) => {
+
+  const playClick = () => {
+    const audio = new Audio(SOUNDS.CLICK);
+    audio.volume = 0.5;
+    audio.play().catch(() => {});
+  };
+
+  const handleSelectLevel = (level: number) => {
+    playClick();
+    onSelectLevel(level);
+  };
+
+  const handleBack = () => {
+    playClick();
+    onBack();
+  };
+
   return (
     <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center select-none overflow-hidden">
        {/* Background Ambience */}
@@ -30,7 +47,7 @@ const Levels: React.FC<LevelsProps> = ({ onBack, onSelectLevel }) => {
           {/* Cellar 1 - Top Center */}
           <div className="flex justify-center w-full">
              <button 
-               onClick={() => onSelectLevel(1)}
+               onClick={() => handleSelectLevel(1)}
                className="group relative w-72 h-44 md:w-96 md:h-56 border-4 border-gray-800 hover:border-red-600 transition-colors duration-300 overflow-hidden bg-black shadow-[0_0_20px_black]"
              >
                 {/* Thumbnail Image Simulation */}
@@ -48,7 +65,7 @@ const Levels: React.FC<LevelsProps> = ({ onBack, onSelectLevel }) => {
           <div className="flex flex-col md:flex-row gap-8 md:gap-24 w-full justify-center">
               {/* Cellar 2 */}
              <button 
-               onClick={() => onSelectLevel(2)}
+               onClick={() => handleSelectLevel(2)}
                className="group relative w-72 h-44 md:w-80 md:h-48 border-4 border-gray-800 hover:border-red-600 transition-colors duration-300 overflow-hidden bg-black shadow-[0_0_20px_black]"
              >
                 <div 
@@ -62,7 +79,7 @@ const Levels: React.FC<LevelsProps> = ({ onBack, onSelectLevel }) => {
 
              {/* Cellar 3 - The Library */}
              <button 
-               onClick={() => onSelectLevel(3)}
+               onClick={() => handleSelectLevel(3)}
                className="group relative w-72 h-44 md:w-80 md:h-48 border-4 border-gray-800 hover:border-red-600 transition-colors duration-300 overflow-hidden bg-black shadow-[0_0_20px_black]"
              >
                 <div 
@@ -79,7 +96,7 @@ const Levels: React.FC<LevelsProps> = ({ onBack, onSelectLevel }) => {
 
        {/* Back Button */}
        <button 
-         onClick={onBack}
+         onClick={handleBack}
          className="absolute bottom-10 right-10 text-4xl text-red-800 font-horror hover:text-red-500 hover:scale-110 transition-all duration-300 z-20 drop-shadow-lg"
        >
          BACK
