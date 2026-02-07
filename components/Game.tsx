@@ -698,6 +698,8 @@ const Game: React.FC<GameProps> = ({
       const bodyGroup = pivot.getObjectByName("bodyGroup");
       if (!bodyGroup) return;
 
+      let isTakingDamage = false;
+
       if (!s.active) {
           if (time >= nextSpawnTimeRef.current) {
               const mapH = mapRef.current.length; 
@@ -824,6 +826,7 @@ const Game: React.FC<GameProps> = ({
               if (difficulty === Difficulty.HARD) damageRate = 50;
 
               if (!isCrawling) {
+                  isTakingDamage = true; // Mark that player is taking damage
                   hpRef.current -= damageRate * dt; 
                   setHealth(hpRef.current);
                   
@@ -841,11 +844,6 @@ const Game: React.FC<GameProps> = ({
               // PLAYER TURNED AROUND (Not Looking)
               
               // DESPAWN MECHANIC:
-              // If she was seen (lastSeenTime > 0) and now player has turned away quickly, 
-              // she should disappear.
-              // We give a tiny grace period (200ms) to allow for quick glitches/mouse flicks 
-              // without accidental despawns, but effectively "Turning Around Fast" triggers this.
-              
               if (s.lastSeenTime > 0 && (time - s.lastSeenTime > 200)) {
                   // Despawn
                   s.active = false;
@@ -870,6 +868,14 @@ const Game: React.FC<GameProps> = ({
               s.active = false; pivot.visible = false; s.isJumpscaring = false;
               s.lastSeenTime = 0;
           }
+      }
+
+      // Health Regeneration (Waiting for health to go up)
+      if (!isTakingDamage && hpRef.current < 100 && hpRef.current > 0) {
+          // Regenerate health at 15 HP per second
+          hpRef.current += 15 * dt;
+          if (hpRef.current > 100) hpRef.current = 100;
+          setHealth(hpRef.current);
       }
   };
 
